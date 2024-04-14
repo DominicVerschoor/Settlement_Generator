@@ -19,3 +19,10 @@ optimizer = BayesianOptimization(
     pbounds=pbounds,
     random_state=1,
 )
+
+optimizer.maximize(
+    init_points=3,
+    n_iter=7,
+)
+
+print(optimizer.max)

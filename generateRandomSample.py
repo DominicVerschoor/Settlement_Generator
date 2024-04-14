@@ -86,15 +86,15 @@ class generateRandomSample:
 
         # append building name and location and dimensions to list
         build_max_x, build_max_y, build_max_z = self.get_building_size(building_name)
-        self.building_location.append(
+        self.building_locations.append(
             (
                 building_name,
-                x_pos,
-                height,
-                z_pos,
-                build_max_x,
-                build_max_y,
-                build_max_z,
+                int(x_pos),
+                int(height),
+                int(z_pos),
+                int(build_max_x),
+                int(build_max_y),
+                int(build_max_z),
             )
         )
 
@@ -110,9 +110,15 @@ class generateRandomSample:
         csv_path = os.path.join("BuildingDataSet", building_name)
         with open(csv_path, newline="") as file:
             reader = csv.DictReader(file)  # Assuming first row contains column headers
-            X_values = np.array([float(row["X"]) for row in reader])
-            Y_values = np.array([float(row["Y"]) for row in reader])
-            Z_values = np.array([float(row["Z"]) for row in reader])
+
+            # Read all values into memory
+            data = list(reader)
+
+            # Reset the file pointer to the beginning of the file
+            file.seek(0)
+            X_values = np.array([float(row["X"]) for row in data])
+            Y_values = np.array([float(row["Y"]) for row in data])
+            Z_values = np.array([float(row["Z"]) for row in data])
 
         # Find the maximum X and Z values
         max_X_value = np.max(X_values)
@@ -168,4 +174,4 @@ class generateRandomSample:
 
 if __name__ == "__main__":
     test = generateRandomSample()
-    test.generate_buildings(dataset="BuildingDataSet", num_building=300)
+    test.generate_buildings(dataset="BuildingDataSet", num_building=30)
