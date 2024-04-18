@@ -6,7 +6,7 @@ import os
 from gdpc import __url__, Editor, Block
 from gdpc.exceptions import InterfaceConnectionError, BuildAreaNotSetError
 from gdpc.vector_tools import addY
-from glm import ivec2
+from glm import ivec2, ivec3
 
 
 class generateRandomSample:
@@ -54,17 +54,11 @@ class generateRandomSample:
         self.worldSlice = self.editor.loadWorldSlice(self.buildRect)
         print("World slice loaded!")
 
-    def get_building_locations(self):
-        """
-        Returns the list of building locations. Name, x_pos, y_pos, z_pos, max_x, max_y, max_z
-        """
-        return self.building_locations
-
-    def paste_building_from_csv(self, building_name, x_pos, z_pos):
+    def paste_building_from_csv(self, building_name, x_pos, z_pos, build):
         """
         Pastes a building from a CSV file at the specified position.
         """
-        heightmap = self.worldSlice.heightmaps["WORLD_SURFACE"]
+        heightmap = self.worldSlice.heightmaps["MOTION_BLOCKING"]
         data = []
 
         # Open the CSV file for reading
@@ -98,9 +92,10 @@ class generateRandomSample:
             )
         )
 
-        for x, y, z, block in data:
-            point = ivec2(x + x_pos, z + z_pos)
-            self.editor.placeBlock(addY(point, height + y), Block(block))
+        if build:
+            for x, y, z, block in data:
+                point = ivec2(x + x_pos, z + z_pos)
+                self.editor.placeBlock(addY(point, height + y), Block(block))
 
     def get_building_size(self, building_name):
         """
@@ -147,16 +142,18 @@ class generateRandomSample:
 
         return x_min, x_max, z_min, z_max
 
-    def generate_buildings(self, dataset, num_building=5):
+    def generate_buildings(self, dataset, num_buildings=5):
         """
         Generates buildings randomly within the build area perimeter.
         """
-        self.check_editor_connection()
-        self.initialize_slice()
+
+        # Create Perimeter
+        for point in self.buildRect.outline:
+            self.editor.placeBlock(addY(point, -61), Block("red_concrete"))
 
         buildings = [file for file in os.listdir(dataset) if file.endswith(".csv")]
 
-        for i in range(num_building):
+        for i in range(num_buildings):
             random_building = random.choice(buildings)
 
             build_max_x, _, build_max_z = self.get_building_size(random_building)
@@ -165,13 +162,65 @@ class generateRandomSample:
             rand_x = random.randint(per_min_x, per_max_x - build_max_x)
             rand_z = random.randint(per_min_z, per_max_z - build_max_z)
 
-            self.paste_building_from_csv(random_building, rand_x, rand_z)
+            self.paste_building_from_csv(random_building, rand_x, rand_z, build=False)
 
-        # Create Perimeter
-        for point in self.buildRect.outline:
-            self.editor.placeBlock(addY(point, -61), Block("red_concrete"))
+    def clear_area(self):
+        for building in self.building_locations:
+            _, x_pos, y_pos, z_pos, max_x, max_y, max_z = building
+
+            for x in range(x_pos, x_pos + max_x + 1):
+                for y in range(y_pos, y_pos + max_y + 1):
+                    for z in range(z_pos, z_pos + max_z + 1):
+                        self.editor.placeBlock(ivec3(x, y, z), Block("minecraft:air"))
+
+        self.building_locations = []
+
+    def map_to_array(self):
+        map = []
+        heightmap = self.worldSlice.heightmaps["MOTION_BLOCKING"]
+        per_min_x, per_max_x, per_min_z, per_max_z = self.perimeter_min_max()
+
+        for x in range(per_min_x, per_max_x + 1):
+            for z in range(per_min_z, per_max_z + 1):
+                pt2 = ivec2(x, z)
+                y = heightmap[tuple(pt2 - self.buildRect.offset)] - 1
+                block = self.editor.getBlock(addY(pt2, y))
+                map.append(
+                    (
+                        block,
+                        int(x),
+                        int(y),
+                        int(z),
+                    )
+                )
+
+        return map
+
+    def choose_generated_buildings(self, params, max_buildings, build=False):
+        num_buildings = int(params[0])
+        x = np.array(params[1 : 1 + num_buildings])
+        z = np.array(params[1 + max_buildings : 1 + 2 * max_buildings])[:num_buildings]
+        buildings = params[1 + 2 * max_buildings :]
+
+        for i in range(num_buildings):
+            cur_build = buildings[i]
+            pt_x = x[i]
+            pt_z = z[i]
+
+            build_max_x, _, build_max_z = self.get_building_size(cur_build)
+            _, per_max_x, _, per_max_z = self.perimeter_min_max()
+
+            if pt_x + build_max_x > per_max_x:
+                pt_x = per_max_x - build_max_x
+            if pt_z + build_max_z > per_max_z:
+                pt_z = per_max_z - build_max_z
+
+            self.paste_building_from_csv(cur_build, pt_x, pt_z, build)
 
 
 if __name__ == "__main__":
     test = generateRandomSample()
-    test.generate_buildings(dataset="BuildingDataSet", num_building=30)
+    # test.map_to_array()
+    test.clear_area()
+    # test.choose_generated_buildings([1, -190, 180, 107, 97, 'acacia.csv', 'birch.csv'], 2, build=True)
+    # test.generate_buildings(dataset="BuildingDataSet", num_buildings=30)
