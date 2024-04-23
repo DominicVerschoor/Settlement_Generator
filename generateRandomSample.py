@@ -7,6 +7,8 @@ from gdpc import __url__, Editor, Block
 from gdpc.exceptions import InterfaceConnectionError, BuildAreaNotSetError
 from gdpc.vector_tools import addY
 from glm import ivec2, ivec3
+from nbtlib import nbt
+
 
 
 class generateRandomSample:

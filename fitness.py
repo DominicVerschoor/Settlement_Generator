@@ -7,8 +7,7 @@ from gdpc.exceptions import InterfaceConnectionError, BuildAreaNotSetError
 from gdpc.vector_tools import addY
 from glm import ivec2, ivec3
 from generateRandomSample import generateRandomSample
-
-import random
+from nbtlib import nbt
 
 
 class Fitness:

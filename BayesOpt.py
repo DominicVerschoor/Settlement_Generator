@@ -21,12 +21,13 @@ class BayesOpt:
         result = gp_minimize(
             self.black_box_function,
             dimensions=space,
-            n_calls=10,
-            n_random_starts=3,
+            n_calls=20,
+            n_random_starts=5,
             random_state=0
         )
 
         return result
+
 
     def black_box_function(self, params):
         self.generator.choose_generated_buildings(params, self.max_buildings)
@@ -43,7 +44,7 @@ if __name__ == "__main__":
     start_time = time.time()
 
     # Optimize the black box function
-    optimizer = BayesOpt(2)
+    optimizer = BayesOpt(15)
     result = optimizer.optimize()
 
     # Calculate the elapsed time
