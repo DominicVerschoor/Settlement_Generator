@@ -2,6 +2,7 @@ from nbt import nbt
 import os
 from glm import ivec2, ivec3
 from gdpc import __url__, Editor, Block
+from gdpc.interface import placeStructure
 
 class nbt_reader:
     def __init__(self, file_path):
@@ -39,11 +40,13 @@ class nbt_reader:
                 door_positions.append(ivec3(x, y, z))
         return door_positions
 
+    def create(self, pos: ivec3):
+        placeStructure(self.nbt_file, pos)
         
 
 
 if __name__ == "__main__":
     test = nbt_reader('oak.nbt')
-    block = ivec3(1,2,0)
-    test.paste_structure()
+    block = ivec3(10,-60,10)
+    test.create(block)
 
