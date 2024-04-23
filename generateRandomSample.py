@@ -8,9 +8,7 @@ from gdpc.exceptions import InterfaceConnectionError, BuildAreaNotSetError
 from gdpc.vector_tools import addY
 from glm import ivec2, ivec3
 from nbt import nbt
-from gdpc.interface import placeStructure
-
-
+from nbt_reader import nbt_reader
 
 class generateRandomSample:
 
@@ -19,6 +17,7 @@ class generateRandomSample:
         Initializes the class instance.
         """
         self.editor = Editor()
+        self.reader = nbt_reader()
         self.check_editor_connection()
         self.initialize_slice()
         self.building_locations = []
