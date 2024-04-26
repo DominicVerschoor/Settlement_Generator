@@ -4,6 +4,7 @@ from glm import ivec2, ivec3
 from gdpc import __url__, Editor, Block
 from gdpc.interface import placeStructure
 
+
 class nbt_reader:
     def __init__(self):
         """
@@ -21,36 +22,48 @@ class nbt_reader:
         # self.palette = self.nbt_file['palette']
 
     def blockFromPallet(self, file_path, block):
-        palette = nbt.NBTFile(os.path.join("nbtData", file_path))['palette']
-        return palette[block['state'].value]
+        palette = nbt.NBTFile(file_path)["palette"]
+        return palette[block["state"].value]
 
     def get_block(self, file_path, pos: ivec3):
-        blocks = nbt.NBTFile(os.path.join("nbtData", file_path))['blocks']
+        blocks = nbt.NBTFile(file_path)["blocks"]
         for current_block in blocks:
-            x, y, z = current_block['pos']
+            x, y, z = current_block["pos"]
             if x.value == pos.x and y.value == pos.y and z.value == pos.z:
-                return Block.fromBlockStateTag(self.blockFromPallet(file_path, current_block))
+                return Block.fromBlockStateTag(
+                    self.blockFromPallet(file_path, current_block)
+                )
 
     def get_door_pos(self, file_path):
-        blocks = nbt.NBTFile(os.path.join("nbtData", file_path))['blocks']
+        blocks = nbt.NBTFile(file_path)["blocks"]
         door_positions = []
         for current_block in blocks:
-            block_name = self.blockFromPallet(file_path, current_block)['Name']
-            if '_door' in block_name:
-                x = current_block['pos'][0].value
-                y = current_block['pos'][1].value
-                z = current_block['pos'][2].value
+            block_name = self.blockFromPallet(file_path, current_block)["Name"]
+            if "_door" in block_name:
+                x = current_block["pos"][0].value
+                y = current_block["pos"][1].value
+                z = current_block["pos"][2].value
                 door_positions.append(ivec3(x, y, z))
         return door_positions
 
+    def get_data(self, file_path, data_type: str):
+        if data_type not in {"size", "entities", "blocks", "palette"}:
+            raise ValueError(
+                "Invalid data_type. Allowed values are 'size', 'entities', 'blocks', 'palette'"
+            )
+
+        nbt_file = nbt.NBTFile(file_path)
+        return nbt_file[data_type]
+
     def create(self, file_path, pos: ivec3):
-        nbt_file = nbt.NBTFile(os.path.join("nbtData", file_path))
-        placeStructure(nbt_file, pos)
-        
+        data = nbt.NBTFile(file_path)
+        placeStructure(structureData=data, position=pos)
+
 
 if __name__ == "__main__":
     test = nbt_reader()
-    block = ivec3(10,-60,10)
-    print(test.get_door_pos('oak.nbt'))
-
-
+    block = ivec3(-211, -60, -34)
+    # test.create("nbtData/basic/oak.nbt", block)
+    print(test.get_data("nbtData/basic/oak.nbt", "size"))
+    print(test.get_data("nbtData/basic/oak.nbt", "blocks"))
+    print(test.get_data("nbtData/basic/oak.nbt", "palette"))
