@@ -3,7 +3,7 @@ from skopt import gp_minimize
 from skopt.space import Integer, Categorical
 import numpy as np
 from generateRandomSample import generateRandomSample
-from Fitness import Fitness
+from fitness import Fitness
 
 class BayesOpt:
     def __init__(self, max_buildings):
@@ -20,17 +20,17 @@ class BayesOpt:
                 [Categorical(['acacia.nbt', 'birch.nbt', 'oak.nbt', 'spruce.nbt']) for _ in range(self.max_buildings)]
 
         result = gp_minimize(
-            self.black_box_function,
+            self.generate_villages,
             dimensions=space,
-            n_calls=1,
-            n_random_starts=1,
+            n_calls=7,
+            n_random_starts=3,
             random_state=0
         )
 
         return result
 
 
-    def black_box_function(self, params):
+    def generate_villages(self, params):
         dataset = 'basic'
         self.generator.choose_generated_buildings(params, dataset, self.max_buildings)
         fitness = Fitness(self.generator.building_locations, self.map)

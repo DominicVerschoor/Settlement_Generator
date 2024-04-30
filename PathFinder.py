@@ -78,7 +78,23 @@ class PathFinder:
         return distance2(current, dest)
 
     def reached_checkpoint(self, current, checkpoint):
+        current = self.get_new_loc(current)
+        checkpoint = self.get_new_loc(checkpoint)
         return current == checkpoint
+    
+    def get_new_loc(self, current_loc, direction=(0,0,0)):
+        moved_loc = tuple(a + b for a, b in zip(current_loc, direction))
+        # Create a dictionary to map coordinates to their indices
+        cord_map = {(cord[1][0], cord[1][2]): i for i, cord in enumerate(self.map)}
+
+        # Check if the coordinates exist in the map
+        if (moved_loc[0], moved_loc[2]) in cord_map:
+            # Get the index of the coordinates in self.map
+            index = cord_map[(moved_loc[0], moved_loc[2])]
+            # Update moved_loc with the corresponding coordinates
+            moved_loc = self.map[index][1]
+
+        return tuple(moved_loc)
 
     def nearest_checkpoint(self, current):
         shortest = float("inf")
@@ -102,7 +118,7 @@ class PathFinder:
             (cord[1][0], cord[1][1], cord[1][2]): self.Cell() for cord in self.map
         }
 
-        start = tuple(self.checkpoints[0])
+        start = self.get_new_loc(self.checkpoints[0])
         self.checkpoints.pop(0)
         cell_details[start].total_cost = 0
         cell_details[start].current_cost = 0
@@ -121,17 +137,17 @@ class PathFinder:
 
             neighbors = [
                 (1, 0, 0),
-                (1, 0, 1),
-                (1, 0, -1),
+                # (1, 0, 1),
+                # (1, 0, -1),
                 (-1, 0, 0),
-                (-1, 0, 1),
-                (-1, 0, -1),
+                # (-1, 0, 1),
+                # (-1, 0, -1),
                 (0, 0, 1),
                 (0, 0, -1),
             ]
 
             for direction in neighbors:
-                new_loc = tuple(a + b for a, b in zip(current_loc, direction))
+                new_loc = self.get_new_loc(current_loc, direction)
 
                 if (
                     self.inbounds(new_loc)
@@ -195,7 +211,7 @@ class PathFinder:
         # Print the path
         for i in path:
             # i = tuple(a + b for a, b in zip(i, (0,-1,0)))
-            self.editor.placeBlock(i, Block("stonedw"))
+            self.editor.placeBlock(i, Block("stone"))
             print("->", i, end=" ")
         print()
 
