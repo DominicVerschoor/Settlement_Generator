@@ -72,6 +72,15 @@ class generateRandomSample:
         if build:
             self.reader.create(building_data, position)
 
+    # def perimeter_min_max(self):
+    #     """
+    #     Returns the minimum and maximum X and Z values of the build area perimeter.
+    #     """
+    #     x_min, z_min = self.buildRect.begin
+    #     x_max, z_max = self.buildRect.end
+
+    #     return x_min, x_max, z_min, z_max
+    
     def perimeter_min_max(self):
         """
         Returns the minimum and maximum X and Z values of the build area perimeter.
@@ -98,7 +107,7 @@ class generateRandomSample:
         # - "MOTION_BLOCKING":           The top blocks with a hitbox or fluid.
         # - "MOTION_BLOCKING_NO_LEAVES": Like MOTION_BLOCKING, but ignoring leaves.
         # - "OCEAN_FLOOR":               The top non-air solid blocks.
-        heightmap = self.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"]
+        heightmap = self.worldSlice.heightmaps["MOTION_BLOCKING"]
         per_min_x, per_max_x, per_min_z, per_max_z = self.perimeter_min_max()
 
         for x in range(per_min_x, per_max_x + 1):
@@ -137,6 +146,4 @@ class generateRandomSample:
 
 if __name__ == "__main__":
     test = generateRandomSample()
-    # test.map_to_array()
-    # test.choose_generated_buildings([1, -190, 180, 107, 97, 'acacia.csv', 'birch.csv'], 2, build=True)
-    # test.generate_buildings(dataset="BuildingDataSet", num_buildings=30)
+    print(test.perimeter_min_max())

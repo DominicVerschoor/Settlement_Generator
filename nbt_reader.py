@@ -36,15 +36,29 @@ class nbt_reader:
 
     def get_door_pos(self, file_path):
         blocks = nbt.NBTFile(file_path)["blocks"]
+
+        direction_map = {
+            "north": (0, 0, 1),
+            "east": (-1, 0, 0),
+            "south": (0, 0, -1),
+            "west": (1, 0, 0),
+        }
+
         door_positions = []
         for current_block in blocks:
             block_name = self.blockFromPallet(file_path, current_block)["Name"]
             if "_door" in block_name:
+                # North: +z, East: -x, South: -z, West: +x
+                direction = self.blockFromPallet(file_path, current_block)["Properties"]['facing'].value
                 x = current_block["pos"][0].value
                 y = current_block["pos"][1].value
                 z = current_block["pos"][2].value
-                door_positions.append(ivec3(x, y, z))
-        return door_positions
+                door_positions.append((ivec3(x, y, z), ivec3(x, y, z) + direction_map.get(direction)))
+        
+        if door_positions is not None:
+            return door_positions
+        
+        return None, None
 
     def get_data(self, file_path, data_type: str):
         if data_type not in {"size", "entities", "blocks", "palette"}:
@@ -63,7 +77,7 @@ class nbt_reader:
 if __name__ == "__main__":
     test = nbt_reader()
     block = ivec3(-211, -60, -34)
-    # test.create("nbtData/basic/oak.nbt", block)
+    test.get_door_pos("nbtData/basic/oak.nbt")
     print(test.get_data("nbtData/basic/oak.nbt", "size"))
     print(test.get_data("nbtData/basic/oak.nbt", "blocks"))
     print(test.get_data("nbtData/basic/oak.nbt", "palette"))
