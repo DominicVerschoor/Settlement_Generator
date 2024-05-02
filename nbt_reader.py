@@ -61,6 +61,10 @@ class nbt_reader:
         return None, None
 
     def get_data(self, file_path, data_type: str):
+        """
+        Get data of building based on the nbt file.
+        datatypes include: size, entities, blocks, palette
+        """
         if data_type not in {"size", "entities", "blocks", "palette"}:
             raise ValueError(
                 "Invalid data_type. Allowed values are 'size', 'entities', 'blocks', 'palette'"
