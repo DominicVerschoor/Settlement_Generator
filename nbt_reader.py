@@ -33,6 +33,8 @@ class nbt_reader:
                 return Block.fromBlockStateTag(
                     self.blockFromPallet(file_path, current_block)
                 )
+            
+        return None
 
     def get_door_pos(self, file_path):
         blocks = nbt.NBTFile(file_path)["blocks"]
@@ -55,7 +57,7 @@ class nbt_reader:
                 z = current_block["pos"][2].value
                 door_positions.append((ivec3(x, y, z), ivec3(x, y, z) + direction_map.get(direction)))
         
-        if door_positions is not None:
+        if len(door_positions) !=  0:
             return door_positions
         
         return None, None
@@ -80,8 +82,11 @@ class nbt_reader:
 
 if __name__ == "__main__":
     test = nbt_reader()
-    block = ivec3(-211, -60, -34)
-    test.get_door_pos("nbtData/basic/oak.nbt")
-    print(test.get_data("nbtData/basic/oak.nbt", "size"))
-    print(test.get_data("nbtData/basic/oak.nbt", "blocks"))
-    print(test.get_data("nbtData/basic/oak.nbt", "palette"))
+    
+    # test.create("nbtData/basic/testsign.nbt", ivec3(-200,-60,40))
+    # print(test.get_door_pos("nbtData/basic/chest_sign.nbt"))
+    # print(test.get_data("nbtData/basic/chest_sign.nbt", "size"))
+    # print(test.get_data("nbtData/basic/chest_sign.nbt", "blocks"))
+    # print(test.get_data("nbtData/basic/chest_sign.nbt", "entities"))
+    # print(test.get_data("nbtData/basic/chest_sign.nbt", "palette"))
+    print(test.get_data("nbtData/basic/chest_sign.nbt", "palette"))

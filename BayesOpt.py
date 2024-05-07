@@ -13,16 +13,17 @@ class BayesOpt:
 
         self.generator.check_editor_connection()
         self.generator.initialize_slice()
-        self.fitness_cost = float("inf")
+        self.fitness_cost = 0
         self.building_locations = []
 
     def optimize(self):
         # TODO: define dataset based on biome and map topology (rivers/sea/etc.)
         # TODO: add context to buildings
+        results = []
         per_min_x, per_max_x, per_min_z, per_max_z = self.generator.perimeter_min_max()
         building_list = self.list_nbt_files("basic")
 
-        for _ in range(self.max_buildings):
+        for i in range(self.max_buildings):
             space = (
                 [Integer(per_min_x, per_max_x)]
                 + [Integer(per_min_z, per_max_z)]
@@ -32,12 +33,21 @@ class BayesOpt:
             result = gp_minimize(
                 self.generate_villages,
                 dimensions=space,
-                n_calls=7,
-                n_random_starts=3,
+                n_calls=80,
+                n_random_starts=20,
                 random_state=0,
             )
+            print("placed", i)
 
-        return result
+            building_output = self.generator.generate_building(result.x)
+            if self.generator.should_build(
+                building_output, self.building_locations, self.fitness_cost
+            ):
+                results.append(result)
+                self.building_locations.append(building_output)
+                self.fitness_cost += result.fun
+
+        return results, self.fitness_cost
 
     def list_nbt_files(self, dataset):
         nbt_files = []
@@ -49,19 +59,20 @@ class BayesOpt:
         return nbt_files
 
     def generate_villages(self, params):
+        fitness_cost = 0
+        building = self.generator.generate_building(params)
         # params = x, y, path2nbt
-        if self.generator.should_build(params, self.building_locations, self.fitness_cost):
-            self.building_locations.append(
-                self.generator.generate_building(params, self.max_buildings)
+        if self.generator.should_build(
+            building, self.building_locations, self.fitness_cost
+        ):
+            fitness_cost = self.generator.evaluate_fitness(
+                building, self.building_locations
             )
-            self.fitness_cost = self.generator.evaluate_fitness(self.building_locations)
 
-        return self.fitness_cost
+        return fitness_cost
 
     def build(self, params):
-        self.generator.choose_generated_buildings(
-            params, self.max_buildings, build=True
-        )
+        self.generator.generate_building(params, build=True)
 
     # Define a custom callback function to monitor the optimization process
     # Define a threshold for improvement
@@ -90,14 +101,15 @@ if __name__ == "__main__":
     start_time = time.time()
 
     # Optimize the black box function
-    # optimizer = BayesOpt(5)
-    # result = optimizer.optimize()
+    optimizer = BayesOpt(13)
+    results, final_score = optimizer.optimize()
 
-    # # Calculate the elapsed time
-    # elapsed_time = time.time() - start_time
+    # Calculate the elapsed time
+    elapsed_time = time.time() - start_time
 
-    # optimizer.build(result.x)
+    for res in results:
+        print("Best parameters:", res.x)
+        print("Best objective:", res.fun)
+        optimizer.build(res.x)
 
-    # print("Elapsed time:", elapsed_time)
-    # print("Best parameters:", result.x)
-    # print("Best objective:", result.fun)
+    print("Elapsed time:", elapsed_time)
