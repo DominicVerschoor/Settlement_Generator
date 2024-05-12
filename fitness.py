@@ -27,12 +27,12 @@ class Fitness:
         Initializes the class instance.
         """
         self.reader = nbt_reader()
-        self.current_building = self.placed_buildings = self.map = []
+        self.current_building = self.placed_buildings = self.terrain_map = []
 
     def set_params(self, current, placed, map, water_map):
         self.current_building = current
         self.placed_buildings = placed
-        self.map = map
+        self.terrain_map = map
         self.water_map = water_map
 
     # def check_floating(self):
@@ -61,8 +61,8 @@ class Fitness:
 
     def check_floating(self):
         counter = 0
-        building_height = self.map[0, 0]
-        counter += np.sum(self.map < building_height)
+        building_height = self.terrain_map[0, 0]
+        counter += np.sum(self.terrain_map < building_height)
         counter += np.sum(self.water_map == 1)
 
         return counter
@@ -88,17 +88,25 @@ class Fitness:
     def total_buildings(self):
         return -1 * (len(self.placed_buildings) + 1)
 
+    # def break_terrain(self):
+    #     # building = path2nbt, ivec of bot left
+    #     counter = 0
+
+    #     x_pos, y_pos, z_pos = self.current_building[1].begin
+    #     x_end, y_end, z_end = self.current_building[1].end
+
+    #     for pos in loop3D(ivec3(x_pos, y_pos, z_pos), ivec3(x_end, y_end, z_end)):
+    #         if pos in [map_loc[1] for map_loc in self.terrain_map]:
+    #             counter += 1
+
+    #     return counter
+    
     def break_terrain(self):
         # building = path2nbt, ivec of bot left
         counter = 0
-
-        x_pos, y_pos, z_pos = self.current_building[1].begin
-        x_end, y_end, z_end = self.current_building[1].end
-
-        for pos in loop3D(ivec3(x_pos, y_pos, z_pos), ivec3(x_end, y_end, z_end)):
-            if pos in [map_loc[1] for map_loc in self.map]:
-                counter += 1
-
+        building_height = self.terrain_map[0, 0]
+        counter += np.sum(self.terrain_map > building_height)
+        
         return counter
 
     def blocked_doors(self):
@@ -111,7 +119,7 @@ class Fitness:
         bot_door_front = bot_door[1] + self.current_building[1].begin
         top_door_front = top_door[1] + self.current_building[1].begin
 
-        for _, block in self.map:
+        for _, block in self.terrain_map:
             if bot_door_front == block or top_door_front == block:
                 counter += 10
 
@@ -155,16 +163,27 @@ class Fitness:
         # TODO
         pass
 
+    # def underground(self):
+    #     counter = 0
+
+    #     max_x, max_y, max_z = self.current_building[1].end
+    #     x_pos, _, z_pos = self.current_building[1].begin
+
+    #     for roof in loop2D((x_pos, z_pos), (max_x, max_z)):
+    #         roof = addY(roof, max_y - 1)
+    #         if roof not in [pos[1] for pos in self.terrain_map]:
+    #             counter += 1
+
+    #     return counter
+    
     def underground(self):
         counter = 0
+        building_height = self.terrain_map[0, 0]
+        _, max_y, _ = self.current_building[1].end
 
-        max_x, max_y, max_z = self.current_building[1].end
-        x_pos, _, z_pos = self.current_building[1].begin
-
-        for roof in loop2D((x_pos, z_pos), (max_x, max_z)):
-            roof = addY(roof, max_y - 1)
-            if roof not in [pos[1] for pos in self.map]:
-                counter += 1
+        height = building_height + max_y
+        
+        counter += np.sum(self.terrain_map > height)
 
         return counter
 
