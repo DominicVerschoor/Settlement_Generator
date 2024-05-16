@@ -18,9 +18,11 @@ class generateRandomSample:
         Initializes the class instance.
         """
         self.editor = Editor()
+        # self.check_editor_connection()
+        # self.initialize_slice()
 
         self.reader = nbt_reader()
-        self.fitness = Fitness()
+        self.fitness = Fitness(self.buildRect.begin[0], self.buildRect.begin[1])
 
     def check_editor_connection(self):
         """
@@ -51,10 +53,8 @@ class generateRandomSample:
             )
             sys.exit(1)
 
-        print("Loading world slice...")
         self.buildRect = self.buildArea.toRect()
         self.worldSlice = self.editor.loadWorldSlice(self.buildRect)
-        print("World slice loaded!")
 
     def create_building(self, building_data, x_pos, z_pos, build=False):
         """
@@ -87,30 +87,7 @@ class generateRandomSample:
 
         return xb, xe, zb, ze
 
-    # def map_area(self, building, neighborhood=(1, 1, 1)):
-    #     # - "WORLD_SURFACE":             The top non-air blocks.
-    #     # - "MOTION_BLOCKING":           The top blocks with a hitbox or fluid.
-    #     # - "MOTION_BLOCKING_NO_LEAVES": Like MOTION_BLOCKING, but ignoring leaves.
-    #     # - "OCEAN_FLOOR":               The top non-air solid blocks.
-    #         #     self._liquidMap = np.where(
-    #         # worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"] > worldSlice.heightmaps["OCEAN_FLOOR"], 1, 0)
-
-    #     height_map = self.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"]
-    #     # array with [x][z] dim. [0][0] = bot left
-    #     map = []
-    #     max_x, max_y, max_z = self.reader.get_data(building[0], "size")
-
-    #     start = building[1].begin
-    #     max_pos = ivec3(start + tuple((max_x.value, max_y.value, max_z.value)))
-
-    #     for loc in loop3D(start - neighborhood, max_pos + neighborhood):
-    #         block = self.editor.getBlock(loc)
-    #         if block.id != "minecraft:air":
-    #             map.append((block, loc))
-
-    #     return map
-
-    def map_area(self, building):
+    def map_area(self):
         """
         Get a subset of the 2D array between the specified x and y value pairs.
 
@@ -122,32 +99,17 @@ class generateRandomSample:
         Returns:
         - Subset of the array between the specified coordinates
         """
-        height_map = self.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"]
-        water_map = np.where(height_map > self.worldSlice.heightmaps["OCEAN_FLOOR"], 1, 0)
+        height_map = self.worldSlice.heightmaps["MOTION_BLOCKING"]
+        water_map = np.where(
+            self.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"]
+            > self.worldSlice.heightmaps["OCEAN_FLOOR"],
+            1,
+            0,
+        )
 
-        
-        offset_x,offset_z, = self.buildRect.begin
-        x0, _, z0 = building[1].begin
+        return height_map, water_map
 
-        x0 = abs(offset_x - x0)
-        z0 = abs(offset_z - z0)
-
-        x_max, _, z_max = self.reader.get_data(building[0], "size")
-
-        x1 = x0 + x_max.value - 1
-        z1 = z0 + z_max.value - 1
-
-        # Use array slicing to extract the subset
-        building_map = height_map[x0 : x1 + 1, z0 : z1 + 1]
-        building_water_map = water_map[x0 : x1 + 1, z0 : z1 + 1]
-
-        return building_map, building_water_map
-
-    def generate_building(self, params, build=False):
-        x = np.array(params[0])
-        z = np.array(params[1])
-        building = params[2]
-
+    def generate_building(self, x, z, building, build=False):
         build_max_x, _, build_max_z = self.reader.get_data(building, "size")
         build_max_x = build_max_x.value
         build_max_z = build_max_z.value
@@ -164,10 +126,10 @@ class generateRandomSample:
 
         fitness = self.evaluate_fitness(current_building, building_locations)
 
-        return fitness < prev_fitness
+        return fitness <= prev_fitness
 
     def evaluate_fitness(self, current_building, placed_buildings):
-        map, water_map = self.map_area(current_building)
+        map, water_map = self.map_area()
 
         self.fitness.set_params(current_building, placed_buildings, map, water_map)
 
