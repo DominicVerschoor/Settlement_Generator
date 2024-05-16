@@ -1,29 +1,33 @@
 import os
 import time
 import sys
+import warnings
 from skopt import gp_minimize
 from skopt.space import Integer, Categorical
 from generateRandomSample import generateRandomSample
 
 
 class BayesOpt:
-    def __init__(self, max_buildings):
+    def __init__(self, max_buildings, depth=0):
         self.max_buildings = max_buildings
         self.generator = generateRandomSample()
+        warnings.filterwarnings("ignore")
 
-        self.generator.check_editor_connection()
-        self.generator.initialize_slice()
         self.fitness_cost = 0
+        self.depth = depth
         self.building_locations = []
+        self.location_sub_tree = []
 
     def optimize(self):
         # TODO: define dataset based on biome and map topology (rivers/sea/etc.)
         # TODO: add context to buildings
+        print("Start Optimization")
         results = []
+        fitness_sub_tree = []
+        self.location_sub_tree = []
         per_min_x, per_max_x, per_min_z, per_max_z = self.generator.perimeter_min_max()
         building_list = self.list_nbt_files("basic")
-
-        for i in range(self.max_buildings):
+        for i in range(max(self.max_buildings, self.max_buildings * self.depth)):
             space = (
                 [Integer(per_min_x, per_max_x)]
                 + [Integer(per_min_z, per_max_z)]
@@ -33,19 +37,28 @@ class BayesOpt:
             result = gp_minimize(
                 self.generate_villages,
                 dimensions=space,
-                n_calls=80,
-                n_random_starts=20,
+                n_calls=30,
+                n_random_starts=10,
                 random_state=0,
             )
-            print("placed", i)
 
             building_output = self.generator.generate_building(result.x)
-            if self.generator.should_build(
-                building_output, self.building_locations, self.fitness_cost
-            ):
-                results.append(result)
-                self.building_locations.append(building_output)
-                self.fitness_cost += result.fun
+            fitness_sub_tree.append(result.fun)
+            self.location_sub_tree.append(building_output)
+
+            if len(fitness_sub_tree) >= self.depth:
+                print("Iteration: ", i)
+                if self.generator.should_build(
+                    self.location_sub_tree[0],
+                    self.building_locations + self.location_sub_tree[1:],
+                    fitness_sub_tree[0],
+                ):
+                    results.append(result)
+                    self.building_locations.append(self.location_sub_tree[0])
+                    self.fitness_cost += fitness_sub_tree[0]
+
+                fitness_sub_tree = []
+                self.location_sub_tree = []
 
         return results, self.fitness_cost
 
@@ -62,12 +75,10 @@ class BayesOpt:
         fitness_cost = 0
         building = self.generator.generate_building(params)
         # params = x, y, path2nbt
-        if self.generator.should_build(
-            building, self.building_locations, self.fitness_cost
-        ):
-            fitness_cost = self.generator.evaluate_fitness(
-                building, self.building_locations
-            )
+
+        fitness_cost = self.generator.evaluate_fitness(
+            building, self.building_locations + self.location_sub_tree
+        )
 
         return fitness_cost
 
@@ -101,7 +112,7 @@ if __name__ == "__main__":
     start_time = time.time()
 
     # Optimize the black box function
-    optimizer = BayesOpt(13)
+    optimizer = BayesOpt(15, depth=2)
     results, final_score = optimizer.optimize()
 
     # Calculate the elapsed time
