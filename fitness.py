@@ -1,44 +1,28 @@
-import itertools
 import numpy as np
 from nbt_reader import nbt_reader
-from gdpc import __url__, Block
-from gdpc.exceptions import InterfaceConnectionError, BuildAreaNotSetError
-from gdpc.vector_tools import (
-    X,
-    Y,
-    Z,
-    XZ,
-    addY,
-    dropY,
-    loop2D,
-    loop3D,
-    perpendicular,
-    toAxisVector2D,
-    distance,
-    Box,
-)
-from glm import ivec2, ivec3
+from gdpc.vector_tools import distance
+from glm import ivec2
 
 
 class Fitness:
 
-    def __init__(self, offset_x, offset_z):
+    def __init__(self):
         """
         Initializes the class instance.
         """
         self.reader = nbt_reader()
-        self.offx = offset_x
-        self.offz = offset_z
         self.current_building = self.placed_buildings = self.terrain_map = (
             self.water_map
         ) = []
 
-    def set_params(self, current, placed, map, water_map):
+    def set_params(self, current, placed, map, water_map, offset_x, offset_z):
+        self.offx = offset_x
+        self.offz = offset_z
         self.current_building = current
         self.placed_buildings = placed
         self.terrain_map = map
         self.water_map = water_map
-        self.mini_terrain, self. mini_water = self.sub_map()
+        self.mini_terrain, self.mini_water = self.sub_map()
 
     def check_floating(self):
         counter = 0
@@ -67,7 +51,7 @@ class Fitness:
         return len(unique_buildings)
 
     def total_buildings(self):
-        return (len(self.placed_buildings) + 1)
+        return len(self.placed_buildings) + 1
 
     def break_terrain(self):
         # building = path2nbt, ivec of bot left
@@ -78,7 +62,9 @@ class Fitness:
         return counter
 
     def blocked_doors(self):
-        door_height = self.cord2map(self.current_building[1].begin[0], self.current_building[1].begin[2])
+        door_height = self.cord2map(
+            self.current_building[1].begin[0], self.current_building[1].begin[2]
+        )
         door_height = self.terrain_map[door_height[0]][door_height[1]]
         bot_door, _ = self.reader.get_door_pos(self.current_building[0])
 
@@ -94,7 +80,7 @@ class Fitness:
             return -10
         elif bot_door_front_height < door_height:
             return -5
-        
+
         return 0
 
     def building_spacing(self):
@@ -131,13 +117,12 @@ class Fitness:
         def get_category(building):
             building_category = None
             for categories in acceptable_relations:
-                category_name = '\\' + categories + '\\'
-                if category_name in building[0]:
+                if categories in building:
                     building_category = categories
-                    
+
             return building_category
 
-        def get_closest_buildings(neighbors = 1):
+        def get_closest_buildings(neighbors=1):
             closest_buildings = []
             x_pos, _, z_pos = self.current_building[1].begin
             max_x, _, max_z = self.current_building[1].end
@@ -169,13 +154,28 @@ class Fitness:
             return [building[0] for building in closest_buildings[:neighbors]]
 
         counter = 0
-        acceptable_relations = {'entertainment': ['residential', 'entertainment', 'water'],
-                                'food': ['residential', 'food', 'production', 'water'],
-                                'gov': ['residential', 'water'],
-                                'production': ['food', 'production', 'residential', 'water'],
-                                'residential': ['entertainment', 'residential', 'food', 'production', 'water'],
-                                'water': ['entertainment', 'residential', 'food', 'production', 'gov', 'water']}
-        
+        acceptable_relations = {
+            "entertainment": ["residential", "entertainment", "water"],
+            "food": ["residential", "food", "production", "water"],
+            "gov": ["residential", "water"],
+            "production": ["food", "production", "residential", "water"],
+            "residential": [
+                "entertainment",
+                "residential",
+                "food",
+                "production",
+                "water",
+            ],
+            "water": [
+                "entertainment",
+                "residential",
+                "food",
+                "production",
+                "gov",
+                "water",
+            ],
+        }
+
         current_category = get_category(self.current_building[0])
         current_category_relations = acceptable_relations[current_category]
 
@@ -186,11 +186,11 @@ class Fitness:
                 counter += 1
             else:
                 counter -= 1
-        
+
         return counter
 
     def large_buildings(self):
-        return 0.5 * (self.current_building[1].volume)
+        return 0.001 * (self.current_building[1].volume)
 
     def underground(self):
         counter = 0
@@ -212,7 +212,7 @@ class Fitness:
     def sub_map(self):
         if len(self.current_building) == 0:
             return None, None
-        
+
         x0, _, z0 = self.current_building[1].begin
         x0, z0 = self.cord2map(x0, z0)
 
@@ -232,8 +232,19 @@ class Fitness:
         aesthetics = 0
         adaptability = 0
 
+
+        # overlap = self.check_overlap()
+        # total_buildings = self.total_buildings()
+        # break_terrain = self.break_terrain()
+        # floating = self.check_floating()
+        # underground = self.underground()
+        # spacing = self.building_spacing()
+        # diversity = self.check_diversity()
+        # large = self.large_buildings()
+        # relations = self.building_placement_relations()
+
         functionality = (
-            self.blocked_doors() + self.check_overlap() + self.total_buildings()
+            self.check_overlap() + self.total_buildings()  # self.blocked_doors() +
         )
         adaptability = (
             self.break_terrain()
@@ -248,13 +259,16 @@ class Fitness:
             + self.check_overlap()
             + self.total_buildings()
             + self.large_buildings()
+            + self.building_placement_relations()
         )
 
+        # return overlap + total_buildings + break_terrain + floating+ underground+spacing+diversity+large+relations
         return (
             ((1 / 3.0) * functionality)
             + ((1 / 3.0) * adaptability)
             + ((1 / 3.0) * aesthetics)
         )
+
 
 if __name__ == "__main__":
     pass

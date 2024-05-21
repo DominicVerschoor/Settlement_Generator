@@ -18,11 +18,11 @@ class generateRandomSample:
         Initializes the class instance.
         """
         self.editor = Editor()
-        # self.check_editor_connection()
-        # self.initialize_slice()
+        self.check_editor_connection()
+        self.initialize_slice()
 
         self.reader = nbt_reader()
-        self.fitness = Fitness(self.buildRect.begin[0], self.buildRect.begin[1])
+        self.fitness = Fitness()
 
     def check_editor_connection(self):
         """
@@ -131,7 +131,7 @@ class generateRandomSample:
     def evaluate_fitness(self, current_building, placed_buildings):
         map, water_map = self.map_area()
 
-        self.fitness.set_params(current_building, placed_buildings, map, water_map)
+        self.fitness.set_params(current_building, placed_buildings, map, water_map, self.buildRect.begin[0], self.buildRect.begin[1])
 
         return self.fitness.total_fitness()
 
