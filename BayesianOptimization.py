@@ -1,18 +1,21 @@
 import os
 import time
 from bayes_opt import BayesianOptimization
+import numpy as np
 from generateRandomSample import generateRandomSample
 
 
 class BayesOpts:
-    def __init__(self, max_buildings, depth=0):
-        self.max_buildings = max_buildings
+    def __init__(self, time, depth=0):
         self.generator = generateRandomSample()
 
+        self.time = time
         self.fitness_cost = 0
         self.depth = depth
         self.building_locations = []
         self.dataset = self.list_nbt_files("normal")
+        self.terrain_map, self.water_map = self.generator.map_area()
+        self.per_min_x, self.per_max_x, self.per_min_z, self.per_max_z = self.generator.perimeter_min_max()
 
     class BuildingNode:
         def __init__(self):
@@ -27,33 +30,36 @@ class BayesOpts:
     def optimize(self):
         print("Start Optimization")
         results = []
-        per_min_x, per_max_x, per_min_z, per_max_z = self.generator.perimeter_min_max()
         building_list = len(self.dataset)
         bounds = {
-            "x": (per_min_x, per_max_x),
-            "z": (per_min_z, per_max_z),
+            "x": (self.per_min_x, self.per_max_x),
+            "z": (self.per_min_z, self.per_max_z),
             "building_id": (0, building_list - 1),
         }
 
-        prev_score = -float('inf')
-        fail_counter = 0
-        for _ in range(self.max_buildings):
-            starting_building = self.top_optimized_candidates(bounds)
-            outputs = self.depth_search_optimization(starting_building, bounds)
-            best_out = self.get_highest_score(outputs)
+        prev_score = -float("inf")
+        start_time = time.time()
+        iteration_end = 0
+        while True:
+            iteration_start = time.time()
+            elapsed_time = iteration_start - start_time
 
-            if best_out.score > prev_score:
+            if elapsed_time >= self.time - iteration_end:
+                print("Time limit reached")
+                break
+
+            starting_building = self.top_optimized_candidates(bounds)
+            best_start = self.get_highest_score(starting_building)
+            if best_start.score > prev_score:
+                outputs = self.depth_search_optimization(starting_building, bounds)
+                best_out = self.get_highest_score(outputs)
                 prev_score = best_out.score
                 x, z, id = self.node2building(best_out)
                 best_building = self.generator.generate_building(x, z, id)
                 self.building_locations.append(best_building)
                 results.append(best_out)
-            else:
-                fail_counter += 1
-            
-            if fail_counter == 5:
-                print('Max capacity reached')
-                break
+
+            iteration_end= time.time() - iteration_start
 
         return results
 
@@ -130,11 +136,20 @@ class BayesOpts:
 
     def test_building_loc(self, x, z, building_id):
         fitness_cost = 0
-        x = int(x)
-        z = int(z)
-        building_id = int(building_id)
-        building = self.dataset[building_id]
-        building_output = self.generator.generate_building(x, z, building)
+        
+        building = self.dataset[int(building_id)]
+        x_max, _, z_max = self.generator.reader.get_data(building, "size")
+        x = int(min(self.per_max_x - x_max.value, x))
+        z = int(min(self.per_max_z - z_max.value, z))
+
+        terrain = self.sub_map(x, z, building)
+        gradient_y, gradient_x = np.gradient(terrain)
+        steepness = np.mean(np.sqrt(gradient_x**2 + gradient_y**2))
+
+        if steepness > 0.2:
+            return -500
+
+        building_output = self.generator.create_building(building, x, z)
 
         fitness_cost = self.generator.evaluate_fitness(
             building_output, self.building_locations
@@ -142,14 +157,33 @@ class BayesOpts:
 
         return fitness_cost
 
+    def sub_map(self, x, z, current_building):
+        if len(current_building) == 0:
+            return None
+
+        x0, z0 = self.cord2map(x, z)
+
+        x_max, _, z_max = self.generator.reader.get_data(current_building, "size")
+
+        x1 = x0 + x_max.value - 1
+        z1 = z0 + z_max.value - 1
+
+        # Use array slicing to extract the subset
+        building_map = self.terrain_map[x0 : x1 + 1, z0 : z1 + 1]
+
+        return building_map
+    
+    def cord2map(self, x, z):
+        px = abs(self.generator.buildRect.begin[0] - x)
+        pz = abs(self.generator.buildRect.begin[1] - z)
+
+        return px, pz
+
     def node2building(self, node):
         id = self.dataset[int(node.params["building_id"])]
         x = int(node.params["x"])
         z = int(node.params["z"])
         return x, z, id
-
-    def building2node(self):
-        pass
 
     def list_nbt_files(self, dataset):
         nbt_files = []
@@ -167,11 +201,12 @@ class BayesOpts:
 
 
 if __name__ == "__main__":
+
     # Record the start time
     start_time = time.time()
 
     # Optimize the black box function
-    optimizer = BayesOpts(30, depth=2)
+    optimizer = BayesOpts(time=600, depth=1)
     results = optimizer.optimize()
 
     # Calculate the elapsed time
