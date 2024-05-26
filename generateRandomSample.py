@@ -7,7 +7,7 @@ from gdpc.exceptions import InterfaceConnectionError, BuildAreaNotSetError
 from gdpc.vector_tools import addY, Box, loop3D
 from glm import ivec2, ivec3
 from nbt import nbt
-from fitness import Fitness
+from ObjectiveFunction import ObjectiveFunction
 from nbt_reader import nbt_reader
 
 
@@ -22,7 +22,7 @@ class generateRandomSample:
         self.initialize_slice()
 
         self.reader = nbt_reader()
-        self.fitness = Fitness()
+        self.obj_func = ObjectiveFunction()
 
     def check_editor_connection(self):
         """
@@ -99,7 +99,7 @@ class generateRandomSample:
         Returns:
         - Subset of the array between the specified coordinates
         """
-        height_map = self.worldSlice.heightmaps["MOTION_BLOCKING"]
+        height_map = self.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"]
         water_map = np.where(
             self.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"]
             > self.worldSlice.heightmaps["OCEAN_FLOOR"],
@@ -131,9 +131,9 @@ class generateRandomSample:
     def evaluate_fitness(self, current_building, placed_buildings):
         map, water_map = self.map_area()
 
-        self.fitness.set_params(current_building, placed_buildings, map, water_map, self.buildRect.begin[0], self.buildRect.begin[1])
+        self.obj_func.set_params(current_building, placed_buildings, map, water_map, self.buildRect.begin[0], self.buildRect.begin[1])
 
-        return self.fitness.total_fitness()
+        return self.obj_func.total_fitness()
 
 
 if __name__ == "__main__":

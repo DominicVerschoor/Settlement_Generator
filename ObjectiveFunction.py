@@ -4,7 +4,7 @@ from gdpc.vector_tools import distance
 from glm import ivec2
 
 
-class Fitness:
+class ObjectiveFunction:
 
     def __init__(self):
         """
@@ -35,11 +35,26 @@ class Fitness:
     def check_overlap(self):
         for building in self.placed_buildings:
             if self.current_building[1].collides(building[1]):
-                return -100
+                return True
 
-        return 0
+        return False
 
-    def check_diversity(self):
+    def building_type_diversity(self):
+        placed_cat = [self.get_category(self.current_building)]
+        for building in self.placed_buildings:
+            placed_cat.append(self.get_category(building))
+
+        unique_categories = set(map(tuple, placed_cat))
+
+        return 10 * len(unique_categories)
+
+    def is_duplicate(self):
+        if self.current_building in self.placed_buildings:
+            return -7
+
+        return 7
+    
+    def building_diversity(self):
         current = []
         current.append(tuple(self.current_building))  # Convert list to tuple
         all_buildings = self.placed_buildings.copy() + current
@@ -48,10 +63,10 @@ class Fitness:
             map(tuple, all_buildings)
         )  # Convert lists to tuples for uniqueness
 
-        return len(unique_buildings)
+        return 5 * len(unique_buildings)
 
     def total_buildings(self):
-        return len(self.placed_buildings) + 1
+        return 5 * len(self.placed_buildings) + 1
 
     def break_terrain(self):
         # building = path2nbt, ivec of bot left
@@ -61,29 +76,29 @@ class Fitness:
 
         return counter
 
-    def blocked_doors(self):
-        door_height = self.cord2map(
-            self.current_building[1].begin[0], self.current_building[1].begin[2]
-        )
-        door_height = self.terrain_map[door_height[0]][door_height[1]]
-        bot_door, _ = self.reader.get_door_pos(self.current_building[0])
+    # def blocked_doors(self):
+    #     door_height = self.cord2map(
+    #         self.current_building[1].begin[0], self.current_building[1].begin[2]
+    #     )
+    #     door_height = self.terrain_map[door_height[0]][door_height[1]]
+    #     bot_door, _ = self.reader.get_door_pos(self.current_building[0])
 
-        if bot_door == None:
-            return 0
+    #     if bot_door == None:
+    #         return 0
 
-        bot_door_front = bot_door[1] + self.current_building[1].begin
+    #     bot_door_front = bot_door[1] + self.current_building[1].begin
 
-        bot_door_front = self.cord2map(bot_door_front[0], bot_door_front[2])
-        bot_door_front_height = self.terrain_map[bot_door_front[0]][bot_door_front[1]]
+    #     bot_door_front = self.cord2map(bot_door_front[0], bot_door_front[2])
+    #     bot_door_front_height = self.terrain_map[bot_door_front[0]][bot_door_front[1]]
 
-        if bot_door_front_height > door_height:
-            return -10
-        elif bot_door_front_height < door_height:
-            return -5
+    #     if bot_door_front_height > door_height:
+    #         return -10
+    #     elif bot_door_front_height < door_height:
+    #         return -5
 
-        return 0
+    #     return 0
 
-    def building_spacing(self):
+    def building_spacing(self, min_dist=3, max_dist=30):
         max_x, _, max_z = self.current_building[1].end
         x_pos, _, z_pos = self.current_building[1].begin
 
@@ -108,21 +123,13 @@ class Fitness:
 
             # TODO: decide on distances
             # too close or too far
-            if smallest_dist < 3 and smallest_dist > 30:
-                return -5
+            if smallest_dist < min_dist and smallest_dist > max_dist:
+                return -10
 
-        return 5
+        return 10
 
     def building_placement_relations(self):
-        def get_category(building):
-            building_category = None
-            for categories in acceptable_relations:
-                if categories in building:
-                    building_category = categories
-
-            return building_category
-
-        def get_closest_buildings(neighbors=1):
+        def get_closest_buildings(neighbors=3):
             closest_buildings = []
             x_pos, _, z_pos = self.current_building[1].begin
             max_x, _, max_z = self.current_building[1].end
@@ -150,7 +157,11 @@ class Fitness:
             # Sort the closest buildings based on their distances
             closest_buildings.sort(key=lambda x: x[1])
 
-            # Return the first 'neighbor' number of closest buildings
+            if neighbors > len(closest_buildings) or neighbors < 0:
+                neighbors = len(
+                    closest_buildings
+                )  # Use the full range if neighbors is out of bounds
+
             return [building[0] for building in closest_buildings[:neighbors]]
 
         counter = 0
@@ -176,21 +187,21 @@ class Fitness:
             ],
         }
 
-        current_category = get_category(self.current_building[0])
+        current_category = self.get_category(self.current_building)
         current_category_relations = acceptable_relations[current_category]
 
         neighbors = get_closest_buildings(3)
         for neighbor in neighbors:
-            neighbor_category = get_category(neighbor[0])
+            neighbor_category = self.get_category(neighbor[0])
             if neighbor_category in current_category_relations:
-                counter += 1
+                counter += 5
             else:
-                counter -= 1
+                counter -= 5
 
         return counter
 
     def large_buildings(self):
-        return 0.001 * (self.current_building[1].volume)
+        return 0.002 * (self.current_building[1].volume)
 
     def underground(self):
         counter = 0
@@ -202,6 +213,22 @@ class Fitness:
         counter += np.sum(self.mini_terrain > height)
 
         return counter
+
+    def get_category(self, building):
+        building_category = None
+        category_list = {
+            "entertainment",
+            "food",
+            "gov",
+            "residential",
+            "production",
+            "water",
+        }
+        for categories in category_list:
+            if categories in building[0]:
+                building_category = categories
+
+        return building_category
 
     def cord2map(self, x, z):
         px = abs(self.offx - x)
@@ -228,46 +255,60 @@ class Fitness:
         return building_map, building_water_map
 
     def total_fitness(self):
-        functionality = 0
-        aesthetics = 0
-        adaptability = 0
+        # functionality = 0
+        # aesthetics = 0
+        # adaptability = 0
 
+        if self.check_overlap():
+            return -10000
 
         # overlap = self.check_overlap()
-        # total_buildings = self.total_buildings()
-        # break_terrain = self.break_terrain()
-        # floating = self.check_floating()
-        # underground = self.underground()
-        # spacing = self.building_spacing()
-        # diversity = self.check_diversity()
-        # large = self.large_buildings()
-        # relations = self.building_placement_relations()
+        total_buildings = self.total_buildings()
+        break_terrain = self.break_terrain()
+        floating = self.check_floating()
+        underground = self.underground()
+        spacing = self.building_spacing()
+        cat_div = self.building_type_diversity()
+        diversity = self.building_diversity()
+        large = self.large_buildings()
+        relations = self.building_placement_relations()
+        duplicate = self.is_duplicate()
 
-        functionality = (
-            self.check_overlap() + self.total_buildings()  # self.blocked_doors() +
-        )
-        adaptability = (
-            self.break_terrain()
-            + self.check_overlap()
-            + self.check_floating()
-            + self.underground()
-            + self.total_buildings()
-        )
-        aesthetics = (
-            self.building_spacing()
-            + self.check_diversity()
-            + self.check_overlap()
-            + self.total_buildings()
-            + self.large_buildings()
-            + self.building_placement_relations()
-        )
-
-        # return overlap + total_buildings + break_terrain + floating+ underground+spacing+diversity+large+relations
         return (
-            ((1 / 3.0) * functionality)
-            + ((1 / 3.0) * adaptability)
-            + ((1 / 3.0) * aesthetics)
+            total_buildings
+            + break_terrain
+            + floating
+            + underground
+            + spacing
+            + diversity
+            + large
+            + relations
+            + cat_div
+            + duplicate
         )
+
+        # functionality = (
+        #     self.total_buildings()
+        # )
+        # adaptability = (
+        #     self.break_terrain()
+        #     + self.check_floating()
+        #     + self.underground()
+        #     + self.total_buildings()
+        # )
+        # aesthetics = (
+        #     self.building_spacing()
+        #     + self.building_diversity()
+        #     + self.total_buildings()
+        #     + self.large_buildings()
+        #     + self.building_placement_relations()
+        # )
+
+        # return (
+        #     ((1 / 3.0) * functionality)
+        #     + ((1 / 3.0) * adaptability)
+        #     + ((1 / 3.0) * aesthetics)
+        # )
 
 
 if __name__ == "__main__":

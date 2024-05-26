@@ -8,9 +8,10 @@ from generateRandomSample import generateRandomSample
 class BayesOpts:
     def __init__(self, time, depth=0):
         self.generator = generateRandomSample()
+        self.seed=0
 
         self.time = time
-        self.fitness_cost = 0
+        self.objective_cost = 0
         self.depth = depth
         self.building_locations = []
         self.dataset = self.list_nbt_files("normal")
@@ -113,12 +114,14 @@ class BayesOpts:
         optimizer = BayesianOptimization(
             f=self.test_building_loc,
             pbounds=bounds,
+            random_state = self.seed
         )
 
         optimizer.maximize(
             init_points=15,
             n_iter=25,
         )
+        self.seed += 1
 
         sorted_fitness = sorted(optimizer.res, key=lambda x: x["target"], reverse=True)
         top_scores = [
@@ -146,8 +149,8 @@ class BayesOpts:
         gradient_y, gradient_x = np.gradient(terrain)
         steepness = np.mean(np.sqrt(gradient_x**2 + gradient_y**2))
 
-        if steepness > 0.2:
-            return -500
+        if steepness > 0.25:
+            return -10000
 
         building_output = self.generator.create_building(building, x, z)
 
