@@ -27,7 +27,11 @@ class ObjectiveFunction:
     def check_floating(self):
         counter = 0
         building_height = self.mini_terrain[0, 0]
-        counter -= np.sum(self.mini_terrain < building_height)
+
+        mask = self.mini_terrain < building_height
+        distances = np.abs(self.mini_terrain[mask] - building_height)
+
+        counter -= np.sum(distances)
         counter -= np.sum(self.mini_water == 1)
 
         return counter
@@ -278,7 +282,7 @@ class ObjectiveFunction:
             total_buildings
             + break_terrain
             + floating
-            + underground
+            # + underground
             + spacing
             + diversity
             + large
