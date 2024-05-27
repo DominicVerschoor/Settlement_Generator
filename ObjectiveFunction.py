@@ -50,7 +50,7 @@ class ObjectiveFunction:
 
         unique_categories = set(map(tuple, placed_cat))
 
-        return 10 * len(unique_categories)
+        return 15 * len(unique_categories)
 
     def is_duplicate(self):
         if self.current_building in self.placed_buildings:
@@ -172,7 +172,7 @@ class ObjectiveFunction:
         acceptable_relations = {
             "entertainment": ["residential", "entertainment", "water"],
             "food": ["residential", "food", "production", "water"],
-            "gov": ["residential", "water"],
+            "gov": ["residential", "water", 'gov'],
             "production": ["food", "production", "residential", "water"],
             "residential": [
                 "entertainment",
@@ -194,7 +194,7 @@ class ObjectiveFunction:
         current_category = self.get_category(self.current_building)
         current_category_relations = acceptable_relations[current_category]
 
-        neighbors = get_closest_buildings(3)
+        neighbors = get_closest_buildings(2)
         for neighbor in neighbors:
             neighbor_category = self.get_category(neighbor[0])
             if neighbor_category in current_category_relations:
@@ -266,11 +266,10 @@ class ObjectiveFunction:
         if self.check_overlap():
             return -10000
 
-        # overlap = self.check_overlap()
         total_buildings = self.total_buildings()
         break_terrain = self.break_terrain()
         floating = self.check_floating()
-        underground = self.underground()
+        # underground = self.underground()
         spacing = self.building_spacing()
         cat_div = self.building_type_diversity()
         diversity = self.building_diversity()
