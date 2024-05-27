@@ -65,6 +65,7 @@ class generateRandomSample:
         # only take heigh of initial (0,0) of building and build off there
         height = height_map[tuple(ivec2(x_pos, z_pos) - self.buildRect.offset)]
         max_x, max_y, max_z = self.reader.get_data(building_data, "size")
+        x_pos, z_pos = self.set_in_bounds(x_pos, z_pos, building_data)
 
         xw = x_pos + max_x.value - 1
         yh = height + max_y.value - 1
@@ -74,9 +75,32 @@ class generateRandomSample:
         position = Box.between(ivec3(x_pos, height, z_pos), ivec3(xw, yh, zd))
 
         if build:
+            self.add_flooring(x_pos, xw, z_pos, zd, height-1)
             self.reader.create(building_data, ivec3(x_pos, height, z_pos))
 
         return str(building_data), position
+    
+    def set_in_bounds(self, x, z, building):
+        #TODO redundant
+        build_max_x, _, build_max_z = self.reader.get_data(building, "size")
+        build_max_x = build_max_x.value
+        build_max_z = build_max_z.value
+        _, per_max_x, _, per_max_z = self.perimeter_min_max()
+
+        x = min(per_max_x - build_max_x, x)
+        z = min(per_max_z - build_max_z, z)
+
+        return x, z
+
+    def add_flooring(self, x0, x1, z0, z1, height):
+        def inclusive_range(start, end):
+            step = 1 if start <= end else -1
+            return range(start, end + step, step)
+
+        for x in inclusive_range(x0, x1):
+            for z in inclusive_range(z0, z1):
+                pos = ivec3(x, height, z)
+                self.reader.create('nbtData\\floor\\flooring.nbt', pos)
 
     def perimeter_min_max(self):
         """
@@ -109,17 +133,6 @@ class generateRandomSample:
 
         return height_map, water_map
 
-    def generate_building(self, x, z, building, build=False):
-        build_max_x, _, build_max_z = self.reader.get_data(building, "size")
-        build_max_x = build_max_x.value
-        build_max_z = build_max_z.value
-        _, per_max_x, _, per_max_z = self.perimeter_min_max()
-
-        x = min(per_max_x - build_max_x, x)
-        z = min(per_max_z - build_max_z, z)
-
-        return self.create_building(building, x, z, build=build)
-
     def should_build(self, current_building, building_locations, prev_fitness):
         if len(building_locations) == 0:
             return True
@@ -142,18 +155,21 @@ if __name__ == "__main__":
     # green = -177,34
     sample.check_editor_connection()
     sample.initialize_slice()
-    generated = []
 
-    generated.append(
-        sample.generate_building(
-            params=[-177, 30, "nbtData\\basic\\birch.nbt"],
-        )
-    )
+    sample.add_flooring(360, 364, 1036, 1032, 69)
 
-    generated.append(
-        sample.generate_building(
-            params=[-177, 37, "nbtData\\basic\\oak.nbt"],
-        )
-    )
+    # generated = []
 
-    print(sample.evaluate_fitness(generated[0], [generated[1]]))
+    # generated.append(
+    #     sample.generate_building(
+    #         params=[-177, 30, "nbtData\\basic\\birch.nbt"],
+    #     )
+    # )
+
+    # generated.append(
+    #     sample.generate_building(
+    #         params=[-177, 37, "nbtData\\basic\\oak.nbt"],
+    #     )
+    # )
+
+    # print(sample.evaluate_fitness(generated[0], [generated[1]]))

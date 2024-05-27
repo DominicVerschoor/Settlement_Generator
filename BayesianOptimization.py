@@ -56,7 +56,7 @@ class BayesOpts:
                 best_out = self.get_highest_score(outputs)
                 prev_score = best_out.score
                 x, z, id = self.node2building(best_out)
-                best_building = self.generator.generate_building(x, z, id)
+                best_building = self.generator.create_building(id, x, z)
                 self.building_locations.append(best_building)
                 results.append(best_out)
 
@@ -200,7 +200,7 @@ class BayesOpts:
 
     def build(self, params):
         x, z, id = self.node2building(params)
-        self.generator.generate_building(x, z, id, build=True)
+        self.generator.create_building(id, x, z, build=True)
 
 
 if __name__ == "__main__":
