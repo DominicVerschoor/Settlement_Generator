@@ -23,6 +23,7 @@ class ObjectiveFunction:
         self.terrain_map = map
         self.water_map = water_map
         self.mini_terrain, self.mini_water = self.sub_map()
+        self.building_size = self.current_building[1].volume
 
     def check_floating(self):
         counter = 0
@@ -50,7 +51,7 @@ class ObjectiveFunction:
 
         unique_categories = set(map(tuple, placed_cat))
 
-        return 15 * len(unique_categories)
+        return 10 * len(unique_categories)
 
     def is_duplicate(self):
         if self.current_building in self.placed_buildings:
@@ -79,28 +80,6 @@ class ObjectiveFunction:
         counter -= np.sum(self.mini_terrain > building_height)
 
         return counter
-
-    # def blocked_doors(self):
-    #     door_height = self.cord2map(
-    #         self.current_building[1].begin[0], self.current_building[1].begin[2]
-    #     )
-    #     door_height = self.terrain_map[door_height[0]][door_height[1]]
-    #     bot_door, _ = self.reader.get_door_pos(self.current_building[0])
-
-    #     if bot_door == None:
-    #         return 0
-
-    #     bot_door_front = bot_door[1] + self.current_building[1].begin
-
-    #     bot_door_front = self.cord2map(bot_door_front[0], bot_door_front[2])
-    #     bot_door_front_height = self.terrain_map[bot_door_front[0]][bot_door_front[1]]
-
-    #     if bot_door_front_height > door_height:
-    #         return -10
-    #     elif bot_door_front_height < door_height:
-    #         return -5
-
-    #     return 0
 
     def building_spacing(self, min_dist=3, max_dist=30):
         max_x, _, max_z = self.current_building[1].end
@@ -205,7 +184,7 @@ class ObjectiveFunction:
         return counter
 
     def large_buildings(self):
-        return 0.002 * (self.current_building[1].volume)
+        return 0.002 * (self.building_size)
 
     def underground(self):
         counter = 0
@@ -259,20 +238,15 @@ class ObjectiveFunction:
         return building_map, building_water_map
 
     def total_fitness(self):
-        # functionality = 0
-        # aesthetics = 0
-        # adaptability = 0
-
         if self.check_overlap():
             return -10000
 
         total_buildings = self.total_buildings()
         break_terrain = self.break_terrain()
         floating = self.check_floating()
-        # underground = self.underground()
         spacing = self.building_spacing()
         cat_div = self.building_type_diversity()
-        diversity = self.building_diversity()
+        # diversity = self.building_diversity()
         large = self.large_buildings()
         relations = self.building_placement_relations()
         duplicate = self.is_duplicate()
@@ -281,37 +255,13 @@ class ObjectiveFunction:
             total_buildings
             + break_terrain
             + floating
-            # + underground
             + spacing
-            + diversity
+            # + diversity
             + large
             + relations
             + cat_div
             + duplicate
         )
-
-        # functionality = (
-        #     self.total_buildings()
-        # )
-        # adaptability = (
-        #     self.break_terrain()
-        #     + self.check_floating()
-        #     + self.underground()
-        #     + self.total_buildings()
-        # )
-        # aesthetics = (
-        #     self.building_spacing()
-        #     + self.building_diversity()
-        #     + self.total_buildings()
-        #     + self.large_buildings()
-        #     + self.building_placement_relations()
-        # )
-
-        # return (
-        #     ((1 / 3.0) * functionality)
-        #     + ((1 / 3.0) * adaptability)
-        #     + ((1 / 3.0) * aesthetics)
-        # )
 
 
 if __name__ == "__main__":

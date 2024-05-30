@@ -8,10 +8,9 @@ from generateRandomSample import generateRandomSample
 class BayesOpts:
     def __init__(self, time, depth=0):
         self.generator = generateRandomSample()
-        self.seed=0
+        self.seed = 0
 
         self.time = time
-        self.objective_cost = 0
         self.depth = depth
         self.building_locations = []
         self.dataset = self.list_nbt_files("normal")
@@ -38,9 +37,9 @@ class BayesOpts:
             "building_id": (0, building_list - 1),
         }
 
-        prev_score = -float("inf")
         start_time = time.time()
         iteration_end = 0
+        prev_score = 0
         while True:
             iteration_start = time.time()
             elapsed_time = iteration_start - start_time
@@ -54,10 +53,10 @@ class BayesOpts:
             if best_start.score > prev_score:
                 outputs = self.depth_search_optimization(starting_building, bounds)
                 best_out = self.get_highest_score(outputs)
-                prev_score = best_out.score
                 x, z, id = self.node2building(best_out)
                 best_building = self.generator.create_building(id, x, z)
                 self.building_locations.append(best_building)
+                prev_score = best_start.score
                 results.append(best_out)
 
             iteration_end= time.time() - iteration_start
@@ -121,8 +120,8 @@ class BayesOpts:
             init_points=15,
             n_iter=25,
         )
+        
         self.seed += 1
-
         sorted_fitness = sorted(optimizer.res, key=lambda x: x["target"], reverse=True)
         top_scores = [
             (entry["target"], entry["params"]) for entry in sorted_fitness[: self.depth]
@@ -208,7 +207,8 @@ if __name__ == "__main__":
     # Record the start time
     start_time = time.time()
 
-    # Optimize the black box function
+    # Optimize the black box function 
+    # 600 = 10 min
     optimizer = BayesOpts(time=600, depth=1)
     results = optimizer.optimize()
 
