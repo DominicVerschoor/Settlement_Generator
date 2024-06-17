@@ -1,7 +1,6 @@
 from nbt import nbt
-import os
-from glm import ivec2, ivec3
-from gdpc import __url__, Editor, Block
+from glm import ivec3
+from gdpc import __url__, Block
 from gdpc.interface import placeStructure
 
 
@@ -15,17 +14,32 @@ class nbt_reader:
             blocks
             palette
         """
-        # self.nbt_file = nbt.NBTFile(os.path.join("nbtData", file_path))
-        # self.size = self.nbt_file['size']
-        # self.entities = self.nbt_file['entities']
-        # self.blocks = self.nbt_file['blocks']
-        # self.palette = self.nbt_file['palette']
 
     def blockFromPallet(self, file_path, block):
+        """
+        Retrieves the block data from the palette based on the block's state.
+
+        Parameters:
+        - file_path: The path to the NBT file containing the palette.
+        - block: The block whose state is used to retrieve the palette entry.
+
+        Returns:
+        - The block data from the palette.
+        """
         palette = nbt.NBTFile(file_path)["palette"]
         return palette[block["state"].value]
 
     def get_block(self, file_path, pos: ivec3):
+        """
+        Retrieves the block at a specific position from the NBT file.
+
+        Parameters:
+        - file_path: The path to the NBT file containing the blocks.
+        - pos: The position (ivec3) of the block to retrieve.
+
+        Returns:
+        - The Block object at the specified position, or None if not found.
+        """
         blocks = nbt.NBTFile(file_path)["blocks"]
         for current_block in blocks:
             x, y, z = current_block["pos"]
@@ -34,33 +48,22 @@ class nbt_reader:
                     self.blockFromPallet(file_path, current_block)
                 )
 
-    def get_door_pos(self, file_path):
-        blocks = nbt.NBTFile(file_path)["blocks"]
-
-        direction_map = {
-            "north": (0, 0, 1),
-            "east": (-1, 0, 0),
-            "south": (0, 0, -1),
-            "west": (1, 0, 0),
-        }
-
-        door_positions = []
-        for current_block in blocks:
-            block_name = self.blockFromPallet(file_path, current_block)["Name"]
-            if "_door" in block_name:
-                # North: +z, East: -x, South: -z, West: +x
-                direction = self.blockFromPallet(file_path, current_block)["Properties"]['facing'].value
-                x = current_block["pos"][0].value
-                y = current_block["pos"][1].value
-                z = current_block["pos"][2].value
-                door_positions.append((ivec3(x, y, z), ivec3(x, y, z) + direction_map.get(direction)))
-        
-        if door_positions is not None:
-            return door_positions
-        
-        return None, None
+        return None
 
     def get_data(self, file_path, data_type: str):
+        """
+        Retrieves specific data of a building from an NBT file.
+
+        Parameters:
+        - file_path: The path to the NBT file containing building data.
+        - data_type: The type of data to retrieve. Allowed values are 'size', 'entities', 'blocks', 'palette'.
+
+        Returns:
+        - The requested data from the NBT file.
+
+        Raises:
+        - ValueError: If an invalid data_type is provided.
+        """
         if data_type not in {"size", "entities", "blocks", "palette"}:
             raise ValueError(
                 "Invalid data_type. Allowed values are 'size', 'entities', 'blocks', 'palette'"
@@ -70,14 +73,24 @@ class nbt_reader:
         return nbt_file[data_type]
 
     def create(self, file_path, pos: ivec3):
+        """
+        Creates a structure based on data from an NBT file at a specified position.
+
+        Parameters:
+        - file_path: The path to the NBT file containing structure data.
+        - pos: The position (ivec3) where the structure should be placed.
+        """
         data = nbt.NBTFile(file_path)
         placeStructure(structureData=data, position=pos)
 
 
 if __name__ == "__main__":
     test = nbt_reader()
-    block = ivec3(-211, -60, -34)
-    test.get_door_pos("nbtData/basic/oak.nbt")
-    print(test.get_data("nbtData/basic/oak.nbt", "size"))
-    print(test.get_data("nbtData/basic/oak.nbt", "blocks"))
-    print(test.get_data("nbtData/basic/oak.nbt", "palette"))
+
+    # test.create("nbtData/basic/testsign.nbt", ivec3(-200,-60,40))
+    # print(test.get_door_pos("nbtData/basic/chest_sign.nbt"))
+    # print(test.get_data("nbtData/basic/chest_sign.nbt", "size"))
+    # print(test.get_data("nbtData/basic/chest_sign.nbt", "blocks"))
+    # print(test.get_data("nbtData/basic/chest_sign.nbt", "entities"))
+    # print(test.get_data("nbtData/basic/chest_sign.nbt", "palette"))
+    print(test.get_data("nbtData/basic/chest_sign.nbt", "palette"))
