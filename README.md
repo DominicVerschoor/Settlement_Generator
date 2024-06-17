@@ -12,5 +12,5 @@ The focus of this thesis is to "design a machine-learning algorithm that can gen
 
 ### How to run
 - Open minecraft and create a new world
-- Type command "\setbuildarea x0 y0 z0 x1 y1 z1" to set build area around where the settlement should be built
+- Type command "\setbuildarea x0 y0 z0 x1 y1 z1" in game to set build perimeter around where the settlement should be built (the y parameter can be anything)
 - Run main.py
