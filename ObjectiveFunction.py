@@ -1,6 +1,6 @@
 import numpy as np
 from nbt_reader import nbt_reader
-from gdpc.vector_tools import distance
+from gdpc.vector_tools import distance, dropY
 from glm import ivec2
 
 
@@ -16,6 +16,18 @@ class ObjectiveFunction:
         ) = []
 
     def set_params(self, current, placed, map, water_map, offset_x, offset_z):
+        """
+        Sets parameters to evaluate the building.
+
+        Parameters:
+        - current: The building currently being evaluated
+        - placed: A list of buildings already placed
+        - map: The height map of the area
+        - water_map: The map indicating water blocks
+        - offset_x: The x-axis offset for the current building's position
+        - offset_z: The z-axis offset for the current building's position
+        """
+
         self.offx = offset_x
         self.offz = offset_z
         self.current_building = current
@@ -23,21 +35,37 @@ class ObjectiveFunction:
         self.terrain_map = map
         self.water_map = water_map
         self.mini_terrain, self.mini_water = self.sub_map()
-        self.building_size = self.current_building[1].volume
+        self.building_base = self.get_base_area()
 
     def check_floating(self):
+        """
+        Evaluates if the building is floating above the terrain or water.
+
+        Returns:
+        - A score representing the penalty for the building being above the terrain or water.
+        """
         counter = 0
         building_height = self.mini_terrain[0, 0]
+        category = self.get_category(self.current_building)
 
         mask = self.mini_terrain < building_height
         distances = np.abs(self.mini_terrain[mask] - building_height)
 
         counter -= np.sum(distances)
-        counter -= np.sum(self.mini_water == 1)
+        if category == "water":
+            counter -= 3 * np.sum(self.mini_water == 0)
+        else:
+            counter -= 3 * np.sum(self.mini_water == 1)
 
         return counter
 
     def check_overlap(self):
+        """
+        Checks if the current building overlaps with any already placed buildings.
+
+        Returns:
+        - True if there is an overlap, otherwise False.
+        """
         for building in self.placed_buildings:
             if self.current_building[1].collides(building[1]):
                 return True
@@ -45,43 +73,69 @@ class ObjectiveFunction:
         return False
 
     def building_type_diversity(self):
+        """
+        Calculates the diversity of building types among the placed buildings, including the current building.
+
+        Returns:
+        - The number of unique building categories.
+        """
         placed_cat = [self.get_category(self.current_building)]
         for building in self.placed_buildings:
             placed_cat.append(self.get_category(building))
 
         unique_categories = set(map(tuple, placed_cat))
 
-        return 10 * len(unique_categories)
+        return len(unique_categories)
 
     def is_duplicate(self):
+        """
+        Checks if the current building is a duplicate of any already placed building.
+
+        Returns:
+        - -1 if the current building is a duplicate, otherwise 1.
+        """
         if self.current_building in self.placed_buildings:
-            return -7
+            return -1
 
-        return 7
-    
-    def building_diversity(self):
-        current = []
-        current.append(tuple(self.current_building))  # Convert list to tuple
-        all_buildings = self.placed_buildings.copy() + current
-
-        unique_buildings = set(
-            map(tuple, all_buildings)
-        )  # Convert lists to tuples for uniqueness
-
-        return 5 * len(unique_buildings)
+        return 1
 
     def total_buildings(self):
-        return 5 * len(self.placed_buildings) + 1
+        """
+        Calculates the total number of buildings, including the current building.
+
+        Returns:
+        - The total number of buildings.
+        """
+        return len(self.placed_buildings) + 1
 
     def break_terrain(self):
-        # building = path2nbt, ivec of bot left
+        """
+        Evaluates the impact of the building on the terrain by considering the terrain breakage.
+
+        Returns:
+        - A score representing the penalty for terrain breakage caused by the building.
+        """
         counter = 0
         building_height = self.mini_terrain[0, 0]
-        counter -= np.sum(self.mini_terrain > building_height)
+
+        mask = self.mini_terrain >= building_height
+        distances = np.abs(self.mini_terrain[mask] - building_height)
+
+        counter -= np.sum(distances)
 
         return counter
 
     def building_spacing(self, min_dist=3, max_dist=30):
+        """
+        Checks the spacing between the current building and already placed buildings to ensure it falls within a specified range.
+
+        Parameters:
+        - min_dist: The minimum acceptable distance between buildings (default is 3).
+        - max_dist: The maximum acceptable distance between buildings (default is 30).
+
+        Returns:
+        - 1 if the spacing is acceptable, otherwise -1.
+        """
         max_x, _, max_z = self.current_building[1].end
         x_pos, _, z_pos = self.current_building[1].begin
 
@@ -104,15 +158,31 @@ class ObjectiveFunction:
                 [min_min_dist, min_max_dist, max_min_dist, max_max_dist]
             )
 
-            # TODO: decide on distances
-            # too close or too far
             if smallest_dist < min_dist and smallest_dist > max_dist:
-                return -10
+                return -1
 
-        return 10
+        return 1
 
     def building_placement_relations(self):
+        """
+        Evaluates the relationship of the current building with its closest neighbors based on predefined acceptable relations.
+
+        Returns:
+        - A tuple containing:
+            - The relationship score of the current building with its neighbors.
+            - The number of closest neighbors considered.
+        """
+
         def get_closest_buildings(neighbors=3):
+            """
+            Finds the closest buildings to the current building.
+
+            Parameters:
+            - neighbors: The number of closest neighbors to consider (default is 3).
+
+            Returns:
+            - A list of the closest buildings.
+            """
             closest_buildings = []
             x_pos, _, z_pos = self.current_building[1].begin
             max_x, _, max_z = self.current_building[1].end
@@ -151,7 +221,7 @@ class ObjectiveFunction:
         acceptable_relations = {
             "entertainment": ["residential", "entertainment", "water"],
             "food": ["residential", "food", "production", "water"],
-            "gov": ["residential", "water", 'gov'],
+            "gov": ["residential", "water", "gov"],
             "production": ["food", "production", "residential", "water"],
             "residential": [
                 "entertainment",
@@ -169,35 +239,38 @@ class ObjectiveFunction:
                 "water",
             ],
         }
-
         current_category = self.get_category(self.current_building)
         current_category_relations = acceptable_relations[current_category]
 
-        neighbors = get_closest_buildings(2)
+        neighbors = get_closest_buildings()
         for neighbor in neighbors:
             neighbor_category = self.get_category(neighbor[0])
             if neighbor_category in current_category_relations:
-                counter += 5
+                counter += 1
             else:
-                counter -= 5
+                counter -= 1
 
-        return counter
+        return counter, len(neighbors)
 
     def large_buildings(self):
-        return 0.002 * (self.building_size)
+        """
+        Calculates a score based on the size of the building's base area.
 
-    def underground(self):
-        counter = 0
-        building_height = self.mini_terrain[0, 0]
-        _, max_y, _ = self.current_building[1].end
-
-        height = building_height + max_y
-
-        counter += np.sum(self.mini_terrain > height)
-
-        return counter
+        Returns:
+        - A score proportional to the building's base area.
+        """
+        return 0.05 * (self.building_base)
 
     def get_category(self, building):
+        """
+        Determines the category of a building.
+
+        Parameters:
+        - building: The building to categorize.
+
+        Returns:
+        - The category of the building as a string.
+        """
         building_category = None
         category_list = {
             "entertainment",
@@ -214,12 +287,28 @@ class ObjectiveFunction:
         return building_category
 
     def cord2map(self, x, z):
+        """
+        Converts coordinates to the corresponding map indices.
+
+        Parameters:
+        - x: The x-coordinate.
+        - z: The z-coordinate.
+
+        Returns:
+        - A tuple (px, pz) representing the map indices.
+        """
         px = abs(self.offx - x)
         pz = abs(self.offz - z)
 
         return px, pz
 
     def sub_map(self):
+        """
+        Extracts a sub-map of the terrain and water for the current building.
+
+        Returns:
+        - A tuple (building_map, building_water_map) representing the terrain and water maps for the building.
+        """
         if len(self.current_building) == 0:
             return None, None
 
@@ -237,32 +326,50 @@ class ObjectiveFunction:
 
         return building_map, building_water_map
 
+    def get_base_area(self):
+        """
+        Calculates the base area of the current building.
+
+        Returns:
+        - The base area of the building.
+        """
+        start = dropY(self.current_building[1].begin)
+        end = dropY(self.current_building[1].end)
+
+        return abs(start[0] - end[0]) * abs(start[1] - end[1])
+
     def total_fitness(self):
+        """
+        Calculates the total fitness score of the current building based on various evaluation metrics.
+
+        Returns:
+        - The total fitness score of the building.
+        """
         if self.check_overlap():
-            return -10000
+            return -100
 
         total_buildings = self.total_buildings()
-        break_terrain = self.break_terrain()
-        floating = self.check_floating()
+        break_terrain = self.building_base + self.break_terrain()
+        floating = self.building_base + self.check_floating()
         spacing = self.building_spacing()
         cat_div = self.building_type_diversity()
-        # diversity = self.building_diversity()
         large = self.large_buildings()
-        relations = self.building_placement_relations()
+        relations, max_relations = self.building_placement_relations()
         duplicate = self.is_duplicate()
 
-        return (
-            total_buildings
-            + break_terrain
-            + floating
-            + spacing
-            # + diversity
-            + large
-            + relations
-            + cat_div
-            + duplicate
-        )
+        # Get the maximum scores
+        max_individual_score = 2 * self.building_base + large
+        max_group_score = total_buildings + cat_div
+        max_relation_score = abs(spacing) + max_relations + abs(duplicate)
 
+        # Normalize the scores
+        individual_score = (break_terrain + large + floating) / max_individual_score
+        relation_score = (spacing + relations + duplicate) / max_relation_score
+        group_score = (
+            total_buildings + spacing + cat_div + relations + duplicate
+        ) / max_group_score
 
-if __name__ == "__main__":
-    pass
+        # Compute the total score
+        total_score = (individual_score + group_score + relation_score) / 3
+
+        return total_score

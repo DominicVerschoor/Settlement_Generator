@@ -1,0 +1,40 @@
+bayesian-optimization==1.4.3
+certifi==2024.6.2
+charset-normalizer==3.3.2
+colorama==0.4.6
+contourpy==1.2.1
+cycler==0.12.1
+fonttools==4.53.0
+gdpc==7.3.0
+idna==3.7
+imageio==2.34.1
+joblib==1.4.2
+kiwisolver==1.4.5
+lazy_loader==0.4
+matplotlib==3.9.0
+mkl-fft @ file:///C:/Users/dev-admin/perseverance-python-buildout/croot/mkl_fft_1699473528480/work
+mkl-random @ file:///C:/Users/dev-admin/perseverance-python-buildout/croot/mkl_random_1699473588250/work
+mkl-service==2.4.0
+more-itertools==10.3.0
+NBT==1.5.1
+networkx==3.3
+numpy @ file:///C:/b/abs_c1ywpu18ar/croot/numpy_and_numpy_base_1708638681471/work/dist/numpy-1.26.4-cp312-cp312-win_amd64.whl#sha256=becc06674317799ad0165a939a7613809d0bee9bd328a1e4308c57c39cacf08c
+opencv-python==4.10.0.82
+packaging==24.1
+pillow==10.3.0
+PyGLM==2.7.1
+pyglm-typing==0.2.1
+pyparsing==3.1.2
+python-dateutil==2.9.0.post0
+requests==2.32.3
+scikit-image==0.23.2
+scikit-learn==1.5.0
+scipy==1.13.1
+setuptools==69.5.1
+six==1.16.0
+termcolor==2.4.0
+threadpoolctl==3.5.0
+tifffile==2024.5.22
+typing_extensions==4.12.2
+urllib3==2.2.1
+wheel==0.43.0

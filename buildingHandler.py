@@ -1,12 +1,9 @@
 import sys
 import numpy as np
-import random
-import os
-from gdpc import __url__, Editor, Block
+from gdpc import __url__, Editor
 from gdpc.exceptions import InterfaceConnectionError, BuildAreaNotSetError
-from gdpc.vector_tools import addY, Box, loop3D
+from gdpc.vector_tools import Box
 from glm import ivec2, ivec3
-from nbt import nbt
 from ObjectiveFunction import ObjectiveFunction
 from nbt_reader import nbt_reader
 
@@ -20,6 +17,10 @@ class generateRandomSample:
         self.editor = Editor()
         self.check_editor_connection()
         self.initialize_slice()
+        self.per_min_x, self.per_max_x, self.per_min_z, self.per_max_z = (
+            self.perimeter_min_max()
+        )
+        self.terrain_map, self.water_map = self.map_area()
 
         self.reader = nbt_reader()
         self.obj_func = ObjectiveFunction()
@@ -58,14 +59,20 @@ class generateRandomSample:
 
     def create_building(self, building_data, x_pos, z_pos, build=False):
         """
-        Pastes a building from a NBT file at the specified position.
-        """
-        height_map = self.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"]
+        Packages building information.
 
+        Parameters:
+        - building_data: file path to the nbt file
+        - x_pos: x position of the building
+        - z_pos: z position of the building
+        - build: if True the building will be placed in game
+        """
         # only take heigh of initial (0,0) of building and build off there
-        height = height_map[tuple(ivec2(x_pos, z_pos) - self.buildRect.offset)]
+        height = self.terrain_map[tuple(ivec2(x_pos, z_pos) - self.buildRect.offset)]
         max_x, max_y, max_z = self.reader.get_data(building_data, "size")
-        x_pos, z_pos = self.set_in_bounds(x_pos, z_pos, building_data)
+
+        x_pos = min(self.per_max_x - max_x.value, x_pos)
+        z_pos = min(self.per_max_z - max_z.value, z_pos)
 
         xw = x_pos + max_x.value - 1
         yh = height + max_y.value - 1
@@ -75,24 +82,23 @@ class generateRandomSample:
         position = Box.between(ivec3(x_pos, height, z_pos), ivec3(xw, yh, zd))
 
         if build:
-            self.add_flooring(x_pos, xw, z_pos, zd, height-1)
+            # self.add_flooring(x_pos, xw, z_pos, zd, height-1)
             self.reader.create(building_data, ivec3(x_pos, height, z_pos))
 
         return str(building_data), position
-    
-    def set_in_bounds(self, x, z, building):
-        #TODO redundant
-        build_max_x, _, build_max_z = self.reader.get_data(building, "size")
-        build_max_x = build_max_x.value
-        build_max_z = build_max_z.value
-        _, per_max_x, _, per_max_z = self.perimeter_min_max()
-
-        x = min(per_max_x - build_max_x, x)
-        z = min(per_max_z - build_max_z, z)
-
-        return x, z
 
     def add_flooring(self, x0, x1, z0, z1, height):
+        '''
+        Creates a basic flooring.
+
+        Parameters:
+        - x0: Starting x coordinate for flooring
+        - x1: Ending x coordinate for flooring
+        - z0: Starting z coordinate for flooring
+        - z1: Ending z coordinate for flooring
+        - height: The y coordinate for flooring
+        '''
+
         def inclusive_range(start, end):
             step = 1 if start <= end else -1
             return range(start, end + step, step)
@@ -100,7 +106,7 @@ class generateRandomSample:
         for x in inclusive_range(x0, x1):
             for z in inclusive_range(z0, z1):
                 pos = ivec3(x, height, z)
-                self.reader.create('nbtData\\floor\\flooring.nbt', pos)
+                self.reader.create("nbtData\\floor\\flooring.nbt", pos)
 
     def perimeter_min_max(self):
         """
@@ -113,15 +119,11 @@ class generateRandomSample:
 
     def map_area(self):
         """
-        Get a subset of the 2D array between the specified x and y value pairs.
-
-        Parameters:
-        - array: 2D numpy array
-        - x0, x1: Start and end x coordinates
-        - y0, y1: Start and end y coordinates
+        Get a 2D arrays of maps on the build area.
 
         Returns:
-        - Subset of the array between the specified coordinates
+        - 2D array height map of the entire build area
+        - 2D array water map detailing which blocks are water or not
         """
         height_map = self.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"]
         water_map = np.where(
@@ -133,43 +135,50 @@ class generateRandomSample:
 
         return height_map, water_map
 
-    def should_build(self, current_building, building_locations, prev_fitness):
-        if len(building_locations) == 0:
-            return True
+    def evaluate_obj(self, current_building, placed_buildings):
+        """
+        Evaluates the current building based its location and already placed buildings.
 
-        fitness = self.evaluate_fitness(current_building, building_locations)
+        Parameters:
+        - current_building: The current building being evaluated
+        - placed_buildings: A list of buildings already placed
 
-        return fitness <= prev_fitness
+        Returns:
+        - The total score of the building 
+        """
 
-    def evaluate_fitness(self, current_building, placed_buildings):
-        map, water_map = self.map_area()
-
-        self.obj_func.set_params(current_building, placed_buildings, map, water_map, self.buildRect.begin[0], self.buildRect.begin[1])
+        self.obj_func.set_params(
+            current_building,
+            placed_buildings,
+            self.terrain_map,
+            self.water_map,
+            self.buildRect.begin[0],
+            self.buildRect.begin[1],
+        )
 
         return self.obj_func.total_fitness()
 
 
 if __name__ == "__main__":
     sample = generateRandomSample()
-    # sample.generate_buildings(dataset="BuildingDataSet", num_buildings=1)
-    # green = -177,34
     sample.check_editor_connection()
     sample.initialize_slice()
 
-    sample.add_flooring(360, 364, 1036, 1032, 69)
+    # sample.add_flooring(360, 364, 1036, 1032, 69)
 
-    # generated = []
+    generated = []
+
+    generated.append(
+        sample.create_building(
+            "nbtData\\normal\\food\carrot_field.nbt", 665, 533, build=False
+        )
+    )
 
     # generated.append(
-    #     sample.generate_building(
-    #         params=[-177, 30, "nbtData\\basic\\birch.nbt"],
+    #     sample.create_building(
+    #         "nbtData\\normal\\food\\barn.nbt", 452, 1355, build=False
     #     )
     # )
 
-    # generated.append(
-    #     sample.generate_building(
-    #         params=[-177, 37, "nbtData\\basic\\oak.nbt"],
-    #     )
-    # )
-
-    # print(sample.evaluate_fitness(generated[0], [generated[1]]))
+    # print(sample.get_individual_score('nbtData\\normal\\food\carrot_field.nbt', 433, 1339))
+    print(sample.evaluate_obj(generated[0], []))
